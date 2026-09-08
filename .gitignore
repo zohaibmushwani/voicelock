@@ -1,0 +1,15 @@
+*.iml
+*.log
+.DS_Store
+.env
+.env.*
+.gradle/
+.idea/
+.kotlin/
+.artifacts/
+local.properties
+**/build/
+**/.cxx/
+**/.externalNativeBuild/
+captures/
+app/src/main/assets/models/
