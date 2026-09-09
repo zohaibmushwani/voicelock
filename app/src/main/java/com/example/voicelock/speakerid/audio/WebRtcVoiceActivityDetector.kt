@@ -17,6 +17,18 @@ class WebRtcVoiceActivityDetector : VoiceActivityDetector {
         if (sampleRate != AudioCapture.SAMPLE_RATE_HZ) return SpeechResult.InvalidSampleRate
         if (samples.isEmpty()) return SpeechResult.NoSpeech
 
+        val speechFrames = frameMask(samples, sampleRate) ?: return SpeechResult.InvalidSampleRate
+        val speechFrameCount = speechFrames.count { it }
+        VoiceLockLog.info("WebRTC VAD: $speechFrameCount/${speechFrames.size} speech frames")
+        return SpeechTrimmer.trim(samples, speechFrames, FRAME_SAMPLES, sampleRate)
+    }
+
+    /**
+     * Returns one VAD decision per 20 ms frame for diarization. The returned mask contains no
+     * audio data and can therefore be safely reduced to timeline metadata by callers.
+     */
+    suspend fun frameMask(samples: FloatArray, sampleRate: Int): BooleanArray? {
+        if (sampleRate != AudioCapture.SAMPLE_RATE_HZ || samples.isEmpty()) return null
         val frameCount = (samples.size + FRAME_SAMPLES - 1) / FRAME_SAMPLES
         val speechFrames = BooleanArray(frameCount)
         VadWebRTC(
@@ -37,10 +49,7 @@ class WebRtcVoiceActivityDetector : VoiceActivityDetector {
                 speechFrames[index] = detector.isSpeech(frame)
             }
         }
-
-        val speechFrameCount = speechFrames.count { it }
-        VoiceLockLog.info("WebRTC VAD: $speechFrameCount/$frameCount speech frames")
-        return SpeechTrimmer.trim(samples, speechFrames, FRAME_SAMPLES, sampleRate)
+        return speechFrames
     }
 
     private companion object {

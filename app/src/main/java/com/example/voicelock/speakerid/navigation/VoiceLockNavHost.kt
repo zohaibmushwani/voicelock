@@ -141,7 +141,12 @@ fun VoiceLockNavHost(
                     )
                 }
                 entry<AppDestination.Diarization> {
-                    DiarizationScreen()
+                    DiarizationScreen(
+                        state = ui.diarization,
+                        onRecord = viewModel::diarize,
+                        onTestIncluded = viewModel::diarizeIncludedFixtureSet,
+                        onChooseFile = viewModel::diarizeFile,
+                    )
                 }
                 entry<AppDestination.Result> { result ->
                     val profileName = result.profileId?.let { id -> ui.profiles.firstOrNull { it.id == id }?.displayName }

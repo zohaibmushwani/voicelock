@@ -27,7 +27,7 @@ Building a secure, speaker-verification-based voice-unlock application for Andro
 *   **Voice Enrollment**: Capture 16kHz mono PCM audio to generate up to ten named speaker profiles using the ECAPA-TDNN model.
 *   **Voice Verification**: Real-time speaker recognition comparing live audio input against a selected profile using cosine similarity.
 *   **Closed-Set Identification**: Compare one live embedding against every encrypted local profile and report the highest match only if it meets the experimental threshold.
-*   **Speaker Clustering & Diarization**: Planned long-recording analysis that combines VAD/segmentation, speaker embeddings, and clustering to label each speech region. The prototype screen includes a rolling waveform graph and color-coded diarized timeline; it is explicitly preview-only until the audio pipeline is implemented.
+*   **Speaker Clustering & Diarization (Experimental)**: A 20-second on-device capture uses WebRTC VAD, overlapping ECAPA speech windows, and bounded online cosine-centroid clustering to label speech as temporary Speaker 1 through Speaker 10. The Material 3 screen shows a live decimated level graph during capture and the real post-capture timeline. It is not overlap-aware and must not be used for security decisions.
 *   **Target Speaker Extraction (Cocktail Party)**: A planned speech-separation feature that will use an enrolled speaker embedding as an identity-conditioning anchor to isolate that person's voice from noise or overlapping speech. The current ECAPA model creates embeddings only; it cannot separate audio by itself.
 *   **Intelligent Audio Filtering**: Integrated WebRTC VAD automatically trims silence and rejects low-quality or short utterances.
 *   **Secure Biometric Storage**: Industry-standard encryption of speaker embeddings using the Android Keystore system to ensure local data privacy.
@@ -44,7 +44,7 @@ Building a secure, speaker-verification-based voice-unlock application for Andro
 
 ## App Flow Contract
 
-Navigation 3 uses serializable sealed `AppDestination` keys: `Permission → Hub → Profiles → Enroll → Result`, `Hub → ProfilePicker → Verify → Result`, `Hub → Identify → Result`, and `Hub → Diarization`. Back-stack keys contain only profile IDs, progress, and rounded display scores—never PCM, embeddings, templates, names, or biometric errors. The diarization route is a visual prototype only; audio capture, segmentation, clustering, and speaker labels remain deliberately out of scope until a separate experiment is approved. The hub exposes a disabled target-speaker-extraction card for a future experiment.
+Navigation 3 uses serializable sealed `AppDestination` keys: `Permission → Hub → Profiles → Enroll → Result`, `Hub → ProfilePicker → Verify → Result`, `Hub → Identify → Result`, and `Hub → Diarization`. Back-stack keys contain only profile IDs, progress, and rounded display scores—never PCM, embeddings, templates, names, or biometric errors. The diarization route emits only decimated audio level plus segment start/end offsets and temporary cluster IDs; it does not retain PCM or embeddings in UI state. The hub exposes a disabled target-speaker-extraction card for a future experiment.
 
 ## Diarization Experiment: Optimized On-Device Design
 
