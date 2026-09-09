@@ -81,12 +81,12 @@ class VoiceLockViewModel(application: Application) : AndroidViewModel(applicatio
         when (val result = engine.verify(pcm)) {
             is VerificationResult.Accepted -> {
                 val percent = (result.similarity * 100).roundToInt().coerceIn(0, 100)
-                log("Voice accepted — $percent% match")
+                log("Voice accepted — similarity $percent%")
                 eventChannel.send(VoiceFlowEvent.Verification(true, percent))
             }
             is VerificationResult.Rejected -> {
                 val percent = result.similarity?.times(100)?.roundToInt()?.coerceIn(0, 100)
-                log(percent?.let { "Voice rejected — $it% match" } ?: result.reason.userMessage)
+                log(percent?.let { "Voice rejected — similarity $it%" } ?: result.reason.userMessage)
                 eventChannel.send(VoiceFlowEvent.Verification(false, percent))
             }
         }

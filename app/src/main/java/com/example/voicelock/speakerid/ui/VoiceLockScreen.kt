@@ -167,10 +167,10 @@ sealed interface VoiceLockUiState {
         override val message = "Enrollment is complete. You can now verify your voice whenever you are ready."
     }
     data class VerificationAccepted(val similarity: Float) : VoiceLockUiState {
-        override val message = "Identity confirmed — ${(similarity * 100).toInt()}% voice match."
+        override val message = "Identity confirmed. Voice similarity: ${(similarity * 100).toInt()}%."
     }
     data class VerificationRejected(val similarity: Float?) : VoiceLockUiState {
-        override val message = similarity?.let { "Voice match was ${(it * 100).toInt()}%. Please try again." }
+        override val message = similarity?.let { "Voice similarity was ${(it * 100).toInt()}%, below the required level. Please try again." }
             ?: "We could not confirm your identity. Please try again."
     }
     data class Error(val detail: String) : VoiceLockUiState {

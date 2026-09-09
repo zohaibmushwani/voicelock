@@ -15,6 +15,8 @@ The app uses Jetpack Compose and Navigation 3 with serializable sealed destinati
 
 Audio and biometric templates remain on the device. Voice similarity is probabilistic and this project should not be treated as the only protection for high-value or safety-critical access.
 
+The displayed percentage is a cosine-similarity score, not a calibrated probability. The current acceptance threshold is `0.70`; initial Pixel 7 testing after reference-compatible preprocessing measured genuine attempts at `0.744–0.843` (including an unseen sentence) and impostor attempts at `0.391–0.450`. A larger representative evaluation is required before production use.
+
 ## Build
 
 Requirements:

@@ -5,13 +5,17 @@ Building the backend audio pipeline for an Android voice-unlock app using speake
 Key Components:
 1. AUDIO CAPTURE: 16kHz mono PCM wrapper around AudioRecord.
 2. VOICE ACTIVITY DETECTION: The maintained `gkonovalov/android-vad` WebRTC module trims silence and rejects short utterances without a separate VAD model.
-3. FEATURE EXTRACTION (NDK): kaldi-native-fbank (JNI/CMake) for 80-bin FBank, 25ms window, 10ms hop, 16kHz. Apply CMN.
+3. FEATURE EXTRACTION (NDK): kaldi-native-fbank (JNI/CMake) matching WeSpeaker ONNX inference: normalized PCM scaled to signed 16-bit amplitude, 80-bin FBank, 25ms Hamming window, 10ms hop, no inference dither, and per-utterance CMN.
 4. EMBEDDING INFERENCE: voxceleb_ECAPA512_LM.onnx (ECAPA-TDNN) via ONNX Runtime Mobile. NNAPI delegate. L2-normalized output.
 5. ENROLLMENT & VERIFICATION LOGIC: Cosine similarity comparison. Android Keystore-backed encryption for local storage. 
 6. PUBLIC API: VoiceAuthEngine interface for enrollment, verification, and state management.
 
 Target: Android (Kotlin), min SDK 24+.
 Security-first approach (favor false-reject over false-accept).
+
+Device calibration after correcting the WeSpeaker frontend measured genuine cosine scores of
+0.744–0.843 and impostor scores of 0.391–0.450. The MVP threshold is 0.70, pending a larger
+representative evaluation before any production use.
 
 ## Project Brief
 

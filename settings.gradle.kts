@@ -25,4 +25,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "voice lock"
 include(":app")
- 

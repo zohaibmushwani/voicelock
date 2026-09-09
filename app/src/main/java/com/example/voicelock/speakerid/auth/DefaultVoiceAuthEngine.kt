@@ -163,10 +163,11 @@ class DefaultVoiceAuthEngine(
     private fun cosineSimilarity(left: FloatArray, right: FloatArray): Float =
         left.indices.sumOf { (left[it] * right[it]).toDouble() }.toFloat().coerceIn(-1f, 1f)
 
-    private companion object {
-        const val MIN_ENROLLMENT_UTTERANCES = 3
-        const val MAX_ENROLLMENT_UTTERANCES = 5
-        const val DEFAULT_SIMILARITY_THRESHOLD = 0.85f
-        const val MIN_VECTOR_MAGNITUDE = 1e-12
+    companion object {
+        /** Conservative device-calibrated start: genuine 0.744–0.843 vs impostor 0.391–0.450. */
+        const val DEFAULT_SIMILARITY_THRESHOLD = 0.70f
+        private const val MIN_ENROLLMENT_UTTERANCES = 3
+        private const val MAX_ENROLLMENT_UTTERANCES = 5
+        private const val MIN_VECTOR_MAGNITUDE = 1e-12
     }
 }

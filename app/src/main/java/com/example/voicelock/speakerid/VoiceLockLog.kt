@@ -9,7 +9,15 @@ import android.util.Log
 object VoiceLockLog {
     const val TAG = "VoiceLock"
 
-    fun info(message: String) = Log.i(TAG, message)
-    fun warn(message: String) = Log.w(TAG, message)
-    fun error(message: String, cause: Throwable? = null) = Log.e(TAG, message, cause)
+    fun info(message: String) {
+        runCatching { Log.i(TAG, message) }
+    }
+
+    fun warn(message: String) {
+        runCatching { Log.w(TAG, message) }
+    }
+
+    fun error(message: String, cause: Throwable? = null) {
+        runCatching { Log.e(TAG, message, cause) }
+    }
 }

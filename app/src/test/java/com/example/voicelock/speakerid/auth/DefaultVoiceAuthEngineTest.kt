@@ -4,6 +4,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.sqrt
 
 class DefaultVoiceAuthEngineTest {
     @Test
@@ -46,6 +47,23 @@ class DefaultVoiceAuthEngineTest {
         val result = engine.verify(shortArrayOf(0, 32767))
 
         assertEquals(VerificationResult.Rejected(0f, VoiceAuthFailure.AUDIO_REJECTED), result)
+    }
+
+    @Test
+    fun calibratedDefaultThresholdAcceptsAboveAndRejectsBelowBoundary() = runTest {
+        suspend fun verifyAt(score: Float): VerificationResult {
+            val provider = object : UtteranceEmbeddingProvider {
+                override suspend fun createEmbedding(utterance: FloatArray) =
+                    EmbeddingExtractionResult.Success(
+                        floatArrayOf(score, sqrt(1f - score * score)),
+                    )
+            }
+            return DefaultVoiceAuthEngine(provider, InMemoryStore(floatArrayOf(1f, 0f)))
+                .verify(shortArrayOf(1))
+        }
+
+        assertTrue(verifyAt(0.71f) is VerificationResult.Accepted)
+        assertTrue(verifyAt(0.69f) is VerificationResult.Rejected)
     }
 
     private class InMemoryStore(var template: FloatArray? = null) : VoiceTemplateStore {

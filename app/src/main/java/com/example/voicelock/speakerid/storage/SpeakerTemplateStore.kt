@@ -45,39 +45,14 @@ class SpeakerTemplateStore(context: Context) : VoiceTemplateStore {
         val buffer = ByteBuffer.allocate(template.size * 4)
         template.forEach { buffer.putFloat(it) }
         val base64String = Base64.encodeToString(buffer.array(), Base64.DEFAULT)
-        sharedPrefs.edit()
-            .putString(KEY_TEMPLATE, base64String)
-            .putInt(KEY_TEMPLATE_VERSION, CURRENT_TEMPLATE_VERSION)
-            .apply()
+        sharedPrefs.edit {
+            putString(KEY_TEMPLATE, base64String)
+                .putInt(KEY_TEMPLATE_VERSION, CURRENT_TEMPLATE_VERSION)
+        }
     }
 
     override suspend fun clear() {
-        sharedPrefs.edit().remove(KEY_TEMPLATE).remove(KEY_TEMPLATE_VERSION).apply()
-    }
-
-    /**
-     * API to save a template with a specific identifier.
-     * Supports multiple templates as per the "templates" (plural) requirement.
-     */
-    suspend fun saveTemplate(id: String, embedding: FloatArray) {
-        val buffer = ByteBuffer.allocate(embedding.size * 4)
-        embedding.forEach { buffer.putFloat(it) }
-        val base64String = Base64.encodeToString(buffer.array(), Base64.DEFAULT)
-        sharedPrefs.edit().putString(id, base64String).apply()
-    }
-
-    /**
-     * API to retrieve a template by its identifier.
-     */
-    suspend fun getTemplate(id: String): FloatArray? {
-        val base64String = sharedPrefs.getString(id, null) ?: return null
-        return try {
-            val bytes = Base64.decode(base64String, Base64.DEFAULT)
-            val buffer = ByteBuffer.wrap(bytes)
-            FloatArray(bytes.size / 4) { buffer.float }
-        } catch (e: Exception) {
-            null
-        }
+        sharedPrefs.edit { remove(KEY_TEMPLATE).remove(KEY_TEMPLATE_VERSION) }
     }
 
     companion object {
