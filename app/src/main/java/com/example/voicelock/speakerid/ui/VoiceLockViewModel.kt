@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.voicelock.speakerid.FBankExtractor
+import com.example.voicelock.speakerid.VoiceLockLog
 import com.example.voicelock.speakerid.audio.AudioCapture
 import com.example.voicelock.speakerid.audio.OnnxSileroVad
 import com.example.voicelock.speakerid.auth.DefaultVoiceAuthEngine
@@ -40,11 +41,14 @@ class VoiceLockViewModel(application: Application) : AndroidViewModel(applicatio
     val events = eventChannel.receiveAsFlow()
 
     init {
+        VoiceLockLog.info("Voice flow initialized")
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { store.read() != null }.onSuccess { enrolled ->
-                mutableUi.value = mutableUi.value.copy(enrolled = enrolled)
-                if (enrolled) log("Encrypted voice template loaded")
-            }
+            runCatching { store.read() != null }
+                .onSuccess { enrolled ->
+                    mutableUi.value = mutableUi.value.copy(enrolled = enrolled)
+                    log(if (enrolled) "Encrypted voice template loaded" else "No enrollment found — ready to enroll")
+                }
+                .onFailure { VoiceLockLog.error("Unable to read enrollment state", it) }
         }
     }
 
@@ -103,9 +107,11 @@ class VoiceLockViewModel(application: Application) : AndroidViewModel(applicatio
                     samples.size < AudioCapture.SAMPLE_RATE_HZ * CAPTURE_SECONDS
                 }
                 if (samples.isEmpty()) error("No audio was captured")
+                log("Captured ${samples.size / AudioCapture.SAMPLE_RATE_HZ}.${(samples.size % AudioCapture.SAMPLE_RATE_HZ) * 10 / AudioCapture.SAMPLE_RATE_HZ}s of audio")
                 val pcm = ShortArray(samples.size) { (samples[it].coerceIn(-1f, 1f) * Short.MAX_VALUE).roundToInt().toShort() }
                 withContext(Dispatchers.Default) { action(pcm) }
             } catch (error: Exception) {
+                VoiceLockLog.error("Voice operation failed: ${error.message ?: error.javaClass.simpleName}", error)
                 fail(error.message ?: "Audio processing failed")
             } finally {
                 mutableUi.value = mutableUi.value.copy(busy = false)
@@ -120,7 +126,8 @@ class VoiceLockViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun log(message: String) {
-        mutableUi.value = mutableUi.value.copy(logs = (mutableUi.value.logs + message).takeLast(4))
+        VoiceLockLog.info(message)
+        mutableUi.value = mutableUi.value.copy(logs = (mutableUi.value.logs + message).takeLast(MAX_STATUS_LINES))
     }
 
     override fun onCleared() {
@@ -129,7 +136,11 @@ class VoiceLockViewModel(application: Application) : AndroidViewModel(applicatio
         super.onCleared()
     }
 
-    private companion object { const val REQUIRED_SAMPLES = 3; const val CAPTURE_SECONDS = 4 }
+    private companion object {
+        const val REQUIRED_SAMPLES = 3
+        const val CAPTURE_SECONDS = 4
+        const val MAX_STATUS_LINES = 8
+    }
 }
 
 data class VoiceFlowUi(

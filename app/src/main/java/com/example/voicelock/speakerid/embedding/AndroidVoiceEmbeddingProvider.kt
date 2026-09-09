@@ -1,6 +1,7 @@
 package com.example.voicelock.speakerid.embedding
 
 import com.example.voicelock.speakerid.FBankExtractor
+import com.example.voicelock.speakerid.VoiceLockLog
 import com.example.voicelock.speakerid.audio.SpeechResult
 import com.example.voicelock.speakerid.audio.VoiceActivityDetector
 import com.example.voicelock.speakerid.auth.EmbeddingExtractionResult
@@ -13,17 +14,43 @@ class AndroidVoiceEmbeddingProvider(
     private val fbank: FBankExtractor,
     private val speakerEncoder: SpeakerEncoder,
 ) : UtteranceEmbeddingProvider {
-    override suspend fun createEmbedding(utterance: FloatArray): EmbeddingExtractionResult =
-        when (val speech = vad.trim(utterance, 16000)) {
-            is SpeechResult.Speech -> runCatching { speakerEncoder.extractEmbedding(fbank.computeFBank(speech.samples)) }
-                .fold({ EmbeddingExtractionResult.Success(it) }, { EmbeddingExtractionResult.Rejected(VoiceAuthFailure.EMBEDDING_INVALID) })
-            SpeechResult.TooShort -> EmbeddingExtractionResult.Rejected(VoiceAuthFailure.SPEECH_TOO_SHORT)
-            SpeechResult.NoSpeech -> EmbeddingExtractionResult.Rejected(VoiceAuthFailure.NO_SPEECH)
-            SpeechResult.InvalidSampleRate -> EmbeddingExtractionResult.Rejected(VoiceAuthFailure.AUDIO_REJECTED)
+    override suspend fun createEmbedding(utterance: FloatArray): EmbeddingExtractionResult {
+        val startedAt = System.nanoTime()
+        VoiceLockLog.info("Embedding pipeline started: ${utterance.size} input samples")
+        return when (val speech = vad.trim(utterance, SAMPLE_RATE_HZ)) {
+            is SpeechResult.Speech -> runCatching {
+                VoiceLockLog.info("VAD accepted ${(speech.samples.size * 1000L) / SAMPLE_RATE_HZ} ms of speech")
+                val features = fbank.computeFBank(speech.samples)
+                VoiceLockLog.info("FBank ready: ${features.size / FBANK_BINS} frames x $FBANK_BINS bins")
+                speakerEncoder.extractEmbedding(features)
+            }.fold(
+                onSuccess = {
+                    VoiceLockLog.info("Embedding ready: ${it.size} values in ${(System.nanoTime() - startedAt) / 1_000_000} ms")
+                    EmbeddingExtractionResult.Success(it)
+                },
+                onFailure = {
+                    VoiceLockLog.error("Embedding inference failed", it)
+                    EmbeddingExtractionResult.Rejected(VoiceAuthFailure.EMBEDDING_INVALID)
+                },
+            )
+            SpeechResult.TooShort -> rejected("VAD rejected speech: too short", VoiceAuthFailure.SPEECH_TOO_SHORT)
+            SpeechResult.NoSpeech -> rejected("VAD rejected audio: no speech", VoiceAuthFailure.NO_SPEECH)
+            SpeechResult.InvalidSampleRate -> rejected("VAD rejected audio: invalid sample rate", VoiceAuthFailure.AUDIO_REJECTED)
         }
+    }
+
+    private fun rejected(message: String, reason: VoiceAuthFailure): EmbeddingExtractionResult.Rejected {
+        VoiceLockLog.warn(message)
+        return EmbeddingExtractionResult.Rejected(reason)
+    }
 
     override fun close() {
         (vad as? AutoCloseable)?.close()
         speakerEncoder.close()
+    }
+
+    private companion object {
+        const val SAMPLE_RATE_HZ = 16_000
+        const val FBANK_BINS = 80
     }
 }

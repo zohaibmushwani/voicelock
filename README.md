@@ -31,6 +31,16 @@ Model files are intentionally not committed. Prepare them first with the Python 
 
 The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
+## ADB diagnostics
+
+VoiceLock writes privacy-safe pipeline events under one logcat tag. Raw PCM, embeddings, and stored templates are never logged.
+
+```powershell
+adb logcat -v time VoiceLock:I *:S
+```
+
+This shows microphone setup, captured duration, VAD decisions, FBank dimensions, model loading and inference timing, enrollment progress, and the final verification score and threshold. The most recent user-friendly events are also displayed in the status panel at the bottom of every app screen.
+
 ## Model preparation tools
 
 The reproducible download, inspection, and mobile quantization scripts live separately from the Android app under `tools/model_prep/`:

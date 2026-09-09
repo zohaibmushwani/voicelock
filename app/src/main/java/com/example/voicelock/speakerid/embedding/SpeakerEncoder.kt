@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import com.example.voicelock.speakerid.VoiceLockLog
 import java.io.File
 import java.nio.FloatBuffer
 import kotlin.math.sqrt
@@ -22,6 +23,7 @@ class SpeakerEncoder(private val modelFile: File) : AutoCloseable {
         get() = _session ?: createSession().also { _session = it }
 
     private fun createSession(): OrtSession {
+        VoiceLockLog.info("Loading ECAPA model: ${modelFile.name} (${modelFile.length() / 1_048_576} MiB)")
         val options = OrtSession.SessionOptions().apply {
             // Configure NNAPI for hardware acceleration
             addNnapi()
@@ -31,7 +33,9 @@ class SpeakerEncoder(private val modelFile: File) : AutoCloseable {
             setInterOpNumThreads(1)
             setIntraOpNumThreads(2)
         }
-        return env.createSession(modelFile.absolutePath, options)
+        return env.createSession(modelFile.absolutePath, options).also {
+            VoiceLockLog.info("ECAPA ONNX session ready")
+        }
     }
 
     constructor(context: Context) : this(ModelAssetInstaller.embeddingModel(context))
@@ -39,11 +43,12 @@ class SpeakerEncoder(private val modelFile: File) : AutoCloseable {
     /**
      * Extracts a 192-dimensional embedding from FBank frames.
      * @param fbank Audio FBank frames of shape (frames, 80).
-     * @return L2-normalized 512-dim embedding vector.
+     * @return L2-normalized 192-dimensional embedding vector.
      */
     fun extractEmbedding(fbank: FloatArray): FloatArray {
         require(fbank.size % 80 == 0) { "FBank input must have 80 bins per frame" }
         val numFrames = fbank.size / 80
+        VoiceLockLog.info("ECAPA inference started: $numFrames frames")
         
         // Input shape: (batch_size=1, time_steps=numFrames, num_bins=80)
         val inputShape = longArrayOf(1, numFrames.toLong(), 80)
@@ -71,7 +76,7 @@ class SpeakerEncoder(private val modelFile: File) : AutoCloseable {
         return when (value) {
             is FloatArray -> value
             is Array<*> -> {
-                // Handle nested arrays if the model returns [1, 512] or similar
+                // Handle nested arrays if the model returns [1, embedding_size] or similar.
                 if (value.isEmpty()) return floatArrayOf()
                 val first = value[0]
                 if (first is FloatArray) return first
@@ -85,6 +90,7 @@ class SpeakerEncoder(private val modelFile: File) : AutoCloseable {
     override fun close() {
         _session?.close()
         _session = null
+        VoiceLockLog.info("ECAPA ONNX session closed")
         // env is often a singleton, but if we opened it, we should close it if ORT requires it.
         // In some versions, env.close() is needed.
     }

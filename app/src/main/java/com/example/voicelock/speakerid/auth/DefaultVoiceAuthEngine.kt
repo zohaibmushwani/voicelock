@@ -1,5 +1,6 @@
 package com.example.voicelock.speakerid.auth
 
+import com.example.voicelock.speakerid.VoiceLockLog
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class DefaultVoiceAuthEngine(
     }
 
     override suspend fun enroll(utterances: List<ShortArray>): EnrollmentResult = withContext(workerDispatcher) {
+        VoiceLockLog.info("Enrollment requested with ${utterances.size} samples")
         if (closed) return@withContext rejectedEnrollment(VoiceAuthFailure.ENGINE_CLOSED)
         if (utterances.size !in MIN_ENROLLMENT_UTTERANCES..MAX_ENROLLMENT_UTTERANCES) {
             return@withContext rejectedEnrollment(VoiceAuthFailure.INVALID_UTTERANCE_COUNT)
@@ -47,7 +49,8 @@ class DefaultVoiceAuthEngine(
 
         mutableState.value = VoiceAuthState.Enrolling
         val embeddings = ArrayList<FloatArray>(utterances.size)
-        for (utterance in utterances) {
+        for ((index, utterance) in utterances.withIndex()) {
+            VoiceLockLog.info("Processing enrollment sample ${index + 1}/${utterances.size}")
             val floatUtterance = pcmToFloat(utterance)
             when (val result = embeddingProvider.createEmbedding(floatUtterance)) {
                 is EmbeddingExtractionResult.Rejected -> return@withContext rejectedEnrollment(result.reason)
@@ -64,13 +67,16 @@ class DefaultVoiceAuthEngine(
         try {
             templateStore.write(template)
             mutableState.value = VoiceAuthState.Ready
+            VoiceLockLog.info("Enrollment template encrypted and saved (${template.size} values)")
             EnrollmentResult.Success(embeddings.size)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            VoiceLockLog.error("Unable to save enrollment template", error)
             rejectedEnrollment(VoiceAuthFailure.STORAGE_FAILURE)
         }
     }
 
     override suspend fun verify(utterance: ShortArray): VerificationResult = withContext(workerDispatcher) {
+        VoiceLockLog.info("Verification requested: ${utterance.size} samples")
         if (closed) return@withContext rejectedVerification(null, VoiceAuthFailure.ENGINE_CLOSED)
         mutableState.value = VoiceAuthState.Verifying
         val template = try {
@@ -92,6 +98,7 @@ class DefaultVoiceAuthEngine(
                     return@withContext rejectedVerification(null, VoiceAuthFailure.EMBEDDING_INVALID)
                 }
                 val similarity = cosineSimilarity(normalizedTemplate, embedding)
+                VoiceLockLog.info("Verification score=${"%.4f".format(similarity)}, threshold=${"%.4f".format(similarityThreshold)}")
                 if (similarity >= similarityThreshold) {
                     mutableState.value = VoiceAuthState.Ready
                     VerificationResult.Accepted(similarity)
@@ -124,11 +131,13 @@ class DefaultVoiceAuthEngine(
     }
 
     private fun rejectedEnrollment(reason: VoiceAuthFailure): EnrollmentResult.Rejected {
+        VoiceLockLog.warn("Enrollment rejected: $reason")
         mutableState.value = VoiceAuthState.Failed(reason)
         return EnrollmentResult.Rejected(reason)
     }
 
     private fun rejectedVerification(similarity: Float?, reason: VoiceAuthFailure): VerificationResult.Rejected {
+        VoiceLockLog.warn("Verification rejected: $reason${similarity?.let { ", score=${"%.4f".format(it)}" } ?: ""}")
         mutableState.value = if (reason == VoiceAuthFailure.NOT_ENROLLED) VoiceAuthState.Unenrolled else VoiceAuthState.Failed(reason)
         return VerificationResult.Rejected(similarity, reason)
     }

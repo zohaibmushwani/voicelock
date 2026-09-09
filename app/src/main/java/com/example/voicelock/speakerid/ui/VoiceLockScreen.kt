@@ -138,7 +138,7 @@ private fun StatusLogPanel(lines: List<String>) {
     Card(modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp)) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("App status · local only", style = MaterialTheme.typography.labelLarge)
-            Text(lines.takeLast(3).ifEmpty { listOf("Ready") }.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(lines.takeLast(5).ifEmpty { listOf("Ready") }.joinToString("\n"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

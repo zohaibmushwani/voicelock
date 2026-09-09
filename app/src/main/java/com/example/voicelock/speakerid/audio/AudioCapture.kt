@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import com.example.voicelock.speakerid.VoiceLockLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -25,6 +26,7 @@ class AudioCapture(
             AudioFormat.ENCODING_PCM_FLOAT,
         )
         check(minBuffer > 0) { "PCM float capture is not supported on this device" }
+        VoiceLockLog.info("Microphone setup: ${sampleRate} Hz mono, minBuffer=$minBuffer bytes")
         val record = AudioRecord.Builder()
             .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
             .setAudioFormat(
@@ -39,18 +41,26 @@ class AudioCapture(
         check(record.state == AudioRecord.STATE_INITIALIZED) { "Unable to initialize microphone capture" }
 
         recorder = record
+        var capturedSamples = 0
         try {
             record.startRecording()
+            VoiceLockLog.info("Microphone recording started")
             val buffer = FloatArray(BUFFER_SAMPLES)
             while (coroutineContext.isActive && record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                 val count = record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
-                if (count > 0 && !onSamples(buffer.copyOf(count))) break
+                if (count > 0) {
+                    capturedSamples += count
+                    if (!onSamples(buffer.copyOf(count))) break
+                } else if (count < 0) {
+                    error("Microphone read failed with code $count")
+                }
                 coroutineContext.ensureActive()
             }
         } finally {
             if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) record.stop()
             record.release()
             recorder = null
+            VoiceLockLog.info("Microphone recording stopped: $capturedSamples samples")
         }
     }
 
