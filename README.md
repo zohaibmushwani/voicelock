@@ -1,6 +1,6 @@
 # VoiceLock
 
-VoiceLock is an experimental, fully on-device speaker-verification app for Android. It records guided enrollment samples, removes silence with WebRTC VAD, creates a speaker embedding with ECAPA-TDNN, and reports the cosine-similarity confidence for a later verification attempt.
+VoiceLock is an experimental, fully on-device speaker-verification and closed-set speaker-identification app for Android. It records guided enrollment samples, removes silence with WebRTC VAD, creates a speaker embedding with ECAPA-TDNN, and reports cosine similarity for later verification or identification.
 
 The app uses Jetpack Compose and Navigation 3 with serializable sealed destinations. Enrollment, verification, permissions, retry paths, confidence results, and a compact in-app status log are represented directly in the UI so the flow remains understandable without Android Studio logcat.
 
@@ -10,8 +10,8 @@ The app uses Jetpack Compose and Navigation 3 with serializable sealed destinati
 2. Detect and trim speech with the `gkonovalov/android-vad` WebRTC library; reject missing or very short speech.
 3. Compute WeSpeaker-compatible 80-bin filter-bank features through the native C++/JNI extractor (16-bit amplitude scale, Hamming window, no inference dither, and per-utterance CMN).
 4. Produce a normalized 192-dimensional ECAPA-TDNN speaker embedding with ONNX Runtime.
-5. Average validated enrollment embeddings and encrypt the template at rest.
-6. Compare a verification embedding with the template using cosine similarity.
+5. Average validated enrollment embeddings and encrypt up to ten named local profiles at rest.
+6. Compare a verification embedding with a chosen profile, or score it against the closed profile set to identify the closest known speaker.
 
 Audio and biometric templates remain on the device. Voice similarity is probabilistic and this project should not be treated as the only protection for high-value or safety-critical access.
 
@@ -41,7 +41,11 @@ VoiceLock writes privacy-safe pipeline events under one logcat tag. Raw PCM, emb
 adb logcat -v time VoiceLock:I *:S
 ```
 
-This shows microphone setup, captured duration, VAD decisions, FBank dimensions, model loading and inference timing, enrollment progress, and the final verification score and threshold. The most recent user-friendly events are also displayed in the status panel at the bottom of every app screen.
+This shows microphone setup, captured duration, VAD decisions, FBank dimensions, model loading and inference timing, enrollment progress, and rounded verification or identification outcomes. The most recent user-friendly events are also displayed in the status panel at the bottom of every app screen.
+
+## Speaker identification experiment
+
+The `experiments` branch supports up to ten named profiles. **Identify Speaker** extracts one live embedding and returns the closest enrolled profile only when its cosine similarity reaches the experimental `0.70` decision threshold; otherwise it reports **Unknown speaker**. This is not anti-spoofing and does not protect against replayed or synthetic audio. Speaker diarization is intentionally shown as coming soon and is not implemented yet.
 
 ## Model preparation tools
 

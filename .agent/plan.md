@@ -7,8 +7,8 @@ Key Components:
 2. VOICE ACTIVITY DETECTION: The maintained `gkonovalov/android-vad` WebRTC module trims silence and rejects short utterances without a separate VAD model.
 3. FEATURE EXTRACTION (NDK): kaldi-native-fbank (JNI/CMake) matching WeSpeaker ONNX inference: normalized PCM scaled to signed 16-bit amplitude, 80-bin FBank, 25ms Hamming window, 10ms hop, no inference dither, and per-utterance CMN.
 4. EMBEDDING INFERENCE: voxceleb_ECAPA512_LM.onnx (ECAPA-TDNN) via ONNX Runtime Mobile. NNAPI delegate. L2-normalized output.
-5. ENROLLMENT & VERIFICATION LOGIC: Cosine similarity comparison. Android Keystore-backed encryption for local storage. 
-6. PUBLIC API: VoiceAuthEngine interface for enrollment, verification, and state management.
+5. ENROLLMENT, VERIFICATION & IDENTIFICATION: Cosine similarity comparison over a closed set of up to ten profiles. Android Keystore-backed encryption for local storage.
+6. PUBLIC API: VoiceAuthEngine interface for named enrollment, selected-profile verification, identification, and state management.
 
 Target: Android (Kotlin), min SDK 24+.
 Security-first approach (favor false-reject over false-accept).
@@ -24,9 +24,12 @@ representative evaluation before any production use.
 Building a secure, speaker-verification-based voice-unlock application for Android. The system focuses on high-precision audio processing and local biometric security.
 
 ## Features
-*   **Voice Enrollment**: Capture 16kHz mono PCM audio to generate a unique speaker embedding (voiceprint) using the ECAPA-TDNN model.
-*   **Voice Verification**: Real-time speaker recognition comparing live audio input against stored embeddings using cosine similarity.
-*   **Intelligent Audio Filtering**: Integrated Silero Voice Activity Detection (VAD) to automatically trim silence and reject low-quality or short utterances.
+*   **Voice Enrollment**: Capture 16kHz mono PCM audio to generate up to ten named speaker profiles using the ECAPA-TDNN model.
+*   **Voice Verification**: Real-time speaker recognition comparing live audio input against a selected profile using cosine similarity.
+*   **Closed-Set Identification**: Compare one live embedding against every encrypted local profile and report the highest match only if it meets the experimental threshold.
+*   **Speaker Clustering & Diarization**: Planned long-recording analysis that combines VAD/segmentation, speaker embeddings, and clustering to label each speech region. The prototype screen includes a rolling waveform graph and color-coded diarized timeline; it is explicitly preview-only until the audio pipeline is implemented.
+*   **Target Speaker Extraction (Cocktail Party)**: A planned speech-separation feature that will use an enrolled speaker embedding as an identity-conditioning anchor to isolate that person's voice from noise or overlapping speech. The current ECAPA model creates embeddings only; it cannot separate audio by itself.
+*   **Intelligent Audio Filtering**: Integrated WebRTC VAD automatically trims silence and rejects low-quality or short utterances.
 *   **Secure Biometric Storage**: Industry-standard encryption of speaker embeddings using the Android Keystore system to ensure local data privacy.
 
 ## High-Level Technical Stack
@@ -41,7 +44,16 @@ Building a secure, speaker-verification-based voice-unlock application for Andro
 
 ## App Flow Contract
 
-Navigation 3 uses serializable sealed `AppDestination` keys: `Permission → Home → Enroll → Result` and `Home → Verify → Result`. Back-stack keys contain only progress and rounded display scores—never PCM, embeddings, templates, or errors with biometric detail. The activity owns the runtime microphone-permission request; screens only emit intents. The engine should replace the current screen action placeholders by navigating to `Result` after an enrollment/verification response.
+Navigation 3 uses serializable sealed `AppDestination` keys: `Permission → Hub → Profiles → Enroll → Result`, `Hub → ProfilePicker → Verify → Result`, `Hub → Identify → Result`, and `Hub → Diarization`. Back-stack keys contain only profile IDs, progress, and rounded display scores—never PCM, embeddings, templates, names, or biometric errors. The diarization route is a visual prototype only; audio capture, segmentation, clustering, and speaker labels remain deliberately out of scope until a separate experiment is approved. The hub exposes a disabled target-speaker-extraction card for a future experiment.
+
+## Diarization Experiment: Optimized On-Device Design
+
+1. **Streaming capture and VAD:** feed 16 kHz mono `AudioRecord` frames to the existing WebRTC VAD at 20 ms frames. Merge adjacent speech frames with a small hangover and split long regions at low-energy gaps; this avoids running embeddings on silence.
+2. **Windowed embeddings:** reuse the existing NDK FBank implementation and ECAPA ONNX session over bounded, overlapping speech windows (initial target: 1.5 s windows, 0.75 s hop). Do not add Kaldi: the project already has the Kaldi-compatible native FBank operation needed by the current model.
+3. **Online clustering:** keep normalized centroid vectors in memory and use cosine distance with a conservative merge threshold. Assign only a compact cluster ID to each segment; resolve names only in the UI when a cluster is explicitly linked to an enrolled profile.
+4. **Bounded processing:** run capture separately from `Dispatchers.Default` inference/clustering workers with a fixed-size queue and drop oldest visual-only frames under load. NDK is reserved for measured hotspots such as energy/overlap calculations—not for control flow or cluster bookkeeping.
+5. **Timeline data:** emit a low-rate immutable UI model: timestamp, decimated level, speech state, start/end offsets, and cluster ID. Never put PCM or embeddings in Compose state or navigation. The existing Compose Canvas draws only the decimated amplitude series, while the Compose timeline renders cluster spans efficiently; this avoids an unnecessary chart-library dependency.
+6. **Profiling gate:** measure real-time factor, CPU, allocations, thermals, and battery on the API 30 device before adding a diarization ONNX model, Kaldi feature dependency, or extra native math library. A dedicated overlap detector or diarization model is a later option only if VAD plus windowed ECAPA clustering proves insufficient.
 
 > [!IMPORTANT]
 > This MVP prioritizes security over convenience, favoring a **false-reject** (requiring re-entry) over a **false-accept** (unauthorized access).

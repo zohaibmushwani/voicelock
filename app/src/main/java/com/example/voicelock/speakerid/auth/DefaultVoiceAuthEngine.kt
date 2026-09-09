@@ -1,6 +1,7 @@
 package com.example.voicelock.speakerid.auth
 
 import com.example.voicelock.speakerid.VoiceLockLog
+import com.example.voicelock.speakerid.storage.SpeakerProfile
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +20,7 @@ import kotlin.math.sqrt
  */
 class DefaultVoiceAuthEngine(
     private val embeddingProvider: UtteranceEmbeddingProvider,
-    private val templateStore: VoiceTemplateStore,
+    private val profileStore: SpeakerProfileRepository,
     private val similarityThreshold: Float = DEFAULT_SIMILARITY_THRESHOLD,
     private val workerDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : VoiceAuthEngine, AutoCloseable {
@@ -31,7 +32,7 @@ class DefaultVoiceAuthEngine(
     init {
         scope.launch {
             try {
-                if (templateStore.read() != null) {
+                if (profileStore.profiles().isNotEmpty()) {
                     mutableState.value = VoiceAuthState.Ready
                 }
             } catch (_: Exception) {
@@ -40,7 +41,7 @@ class DefaultVoiceAuthEngine(
         }
     }
 
-    override suspend fun enroll(utterances: List<ShortArray>): EnrollmentResult = withContext(workerDispatcher) {
+    override suspend fun enroll(displayName: String, utterances: List<ShortArray>): EnrollmentResult = withContext(workerDispatcher) {
         VoiceLockLog.info("Enrollment requested with ${utterances.size} samples")
         if (closed) return@withContext rejectedEnrollment(VoiceAuthFailure.ENGINE_CLOSED)
         if (utterances.size !in MIN_ENROLLMENT_UTTERANCES..MAX_ENROLLMENT_UTTERANCES) {
@@ -65,27 +66,27 @@ class DefaultVoiceAuthEngine(
         val template = averageAndNormalize(embeddings)
             ?: return@withContext rejectedEnrollment(VoiceAuthFailure.EMBEDDING_INVALID)
         try {
-            templateStore.write(template)
+            val profile = profileStore.create(displayName, template)
             mutableState.value = VoiceAuthState.Ready
-            VoiceLockLog.info("Enrollment template encrypted and saved (${template.size} values)")
-            EnrollmentResult.Success(embeddings.size)
+            VoiceLockLog.info("Enrollment profile encrypted and saved (${template.size} values)")
+            EnrollmentResult.Success(profile.id, profile.displayName, embeddings.size)
         } catch (error: Exception) {
             VoiceLockLog.error("Unable to save enrollment template", error)
             rejectedEnrollment(VoiceAuthFailure.STORAGE_FAILURE)
         }
     }
 
-    override suspend fun verify(utterance: ShortArray): VerificationResult = withContext(workerDispatcher) {
+    override suspend fun verify(profileId: String, utterance: ShortArray): VerificationResult = withContext(workerDispatcher) {
         VoiceLockLog.info("Verification requested: ${utterance.size} samples")
         if (closed) return@withContext rejectedVerification(null, VoiceAuthFailure.ENGINE_CLOSED)
         mutableState.value = VoiceAuthState.Verifying
-        val template = try {
-            templateStore.read()
+        val profile = try {
+            profileStore.profile(profileId)
         } catch (_: Exception) {
             return@withContext rejectedVerification(null, VoiceAuthFailure.STORAGE_FAILURE)
         } ?: return@withContext rejectedVerification(null, VoiceAuthFailure.NOT_ENROLLED)
 
-        val normalizedTemplate = normalize(template)
+        val normalizedTemplate = normalize(profile.embedding)
             ?: return@withContext rejectedVerification(null, VoiceAuthFailure.EMBEDDING_INVALID)
         
         val floatUtterance = pcmToFloat(utterance)
@@ -109,14 +110,45 @@ class DefaultVoiceAuthEngine(
         }
     }
 
+    override suspend fun identify(utterance: ShortArray): IdentificationResult = withContext(workerDispatcher) {
+        VoiceLockLog.info("Speaker identification requested: ${utterance.size} samples")
+        if (closed) return@withContext IdentificationResult.Rejected(VoiceAuthFailure.ENGINE_CLOSED)
+        mutableState.value = VoiceAuthState.Verifying
+        val profiles = try {
+            profileStore.profiles().sortedBy { it.id }
+        } catch (_: Exception) {
+            return@withContext IdentificationResult.Rejected(VoiceAuthFailure.STORAGE_FAILURE)
+        }
+        if (profiles.isEmpty()) return@withContext IdentificationResult.Rejected(VoiceAuthFailure.NOT_ENROLLED)
+        val embedding = when (val result = embeddingProvider.createEmbedding(pcmToFloat(utterance))) {
+            is EmbeddingExtractionResult.Rejected -> return@withContext IdentificationResult.Rejected(result.reason)
+            is EmbeddingExtractionResult.Success -> normalize(result.embedding)
+                ?: return@withContext IdentificationResult.Rejected(VoiceAuthFailure.EMBEDDING_INVALID)
+        }
+        val scored = profiles.mapNotNull { profile ->
+            normalize(profile.embedding)
+                ?.takeIf { it.size == embedding.size }
+                ?.let { profile to cosineSimilarity(it, embedding) }
+        }
+        if (scored.isEmpty()) return@withContext IdentificationResult.Rejected(VoiceAuthFailure.EMBEDDING_INVALID)
+        val winner = scored.maxWithOrNull(compareBy<Pair<SpeakerProfile, Float>> { it.second }.thenBy { it.first.id })!!
+        VoiceLockLog.info("Identification compared ${scored.size} profiles; best score=${"%.4f".format(winner.second)}")
+        mutableState.value = VoiceAuthState.Ready
+        if (winner.second >= similarityThreshold) {
+            IdentificationResult.Identified(winner.first.id, winner.second)
+        } else {
+            IdentificationResult.Unknown(winner.second)
+        }
+    }
+
     override fun isEnrolled(): Boolean = state.value == VoiceAuthState.Ready
 
-    override fun clearEnrollment() {
+    override fun deleteProfile(profileId: String) {
         if (closed) return
         scope.launch {
             try {
-                templateStore.clear()
-                mutableState.value = VoiceAuthState.Unenrolled
+                profileStore.delete(profileId)
+                mutableState.value = if (profileStore.profiles().isEmpty()) VoiceAuthState.Unenrolled else VoiceAuthState.Ready
             } catch (_: Exception) {
                 mutableState.value = VoiceAuthState.Failed(VoiceAuthFailure.STORAGE_FAILURE)
             }

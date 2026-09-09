@@ -3,7 +3,6 @@ package com.example.voicelock.speakerid.embedding
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
-import android.content.Context
 import com.example.voicelock.speakerid.VoiceLockLog
 import java.io.File
 import java.nio.FloatBuffer
@@ -37,8 +36,6 @@ class SpeakerEncoder(private val modelFile: File) : AutoCloseable {
             VoiceLockLog.info("ECAPA ONNX session ready")
         }
     }
-
-    constructor(context: Context) : this(ModelAssetInstaller.embeddingModel(context))
 
     /**
      * Extracts a 192-dimensional embedding from FBank frames.

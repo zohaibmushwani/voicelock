@@ -75,15 +75,15 @@ fun VoiceLockScreen(
             ) {
                 Icon(
                     imageVector = when (state) {
-                        is VoiceLockUiState.VerificationAccepted, VoiceLockUiState.EnrollmentComplete -> Icons.Outlined.CheckCircle
-                        is VoiceLockUiState.VerificationRejected, is VoiceLockUiState.Error -> Icons.Outlined.ErrorOutline
+                        is VoiceLockUiState.VerificationAccepted, is VoiceLockUiState.IdentificationAccepted, VoiceLockUiState.EnrollmentComplete -> Icons.Outlined.CheckCircle
+                        is VoiceLockUiState.VerificationRejected, is VoiceLockUiState.UnknownSpeaker, is VoiceLockUiState.Error -> Icons.Outlined.ErrorOutline
                         else -> Icons.Outlined.Security
                     },
                     contentDescription = null,
                     modifier = Modifier.size(if (isMinimal) 48.dp else 64.dp),
                     tint = when (state) {
-                        is VoiceLockUiState.VerificationAccepted, VoiceLockUiState.EnrollmentComplete -> MaterialTheme.colorScheme.primary
-                        is VoiceLockUiState.VerificationRejected, is VoiceLockUiState.Error -> MaterialTheme.colorScheme.error
+                        is VoiceLockUiState.VerificationAccepted, is VoiceLockUiState.IdentificationAccepted, VoiceLockUiState.EnrollmentComplete -> MaterialTheme.colorScheme.primary
+                        is VoiceLockUiState.VerificationRejected, is VoiceLockUiState.UnknownSpeaker, is VoiceLockUiState.Error -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.secondary
                     },
                 )
@@ -94,6 +94,8 @@ fun VoiceLockScreen(
                             is VoiceLockUiState.EnrollmentComplete -> "Enrollment Successful"
                             is VoiceLockUiState.VerificationAccepted -> "Access Granted"
                             is VoiceLockUiState.VerificationRejected -> "Access Denied"
+                            is VoiceLockUiState.IdentificationAccepted -> "Speaker Identified"
+                            is VoiceLockUiState.UnknownSpeaker -> "Unknown Speaker"
                             is VoiceLockUiState.Processing -> "Voice Recognition"
                             else -> "VoiceLock"
                         },
@@ -241,6 +243,15 @@ fun VoiceLockScreen(
                             Text("Verify Again")
                         }
                     }
+                    is VoiceLockUiState.IdentificationAccepted,
+                    is VoiceLockUiState.UnknownSpeaker -> {
+                        Button(onClick = onVerify, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+                            Text("Identify Another Speaker")
+                        }
+                        OutlinedButton(onClick = onEnroll, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+                            Text("Manage Profiles")
+                        }
+                    }
                 }
             }
         }
@@ -251,7 +262,7 @@ fun VoiceLockScreen(
 }
 
 @Composable
-private fun StatusLogPanel(lines: List<String>) {
+fun StatusLogPanel(lines: List<String>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -322,6 +333,14 @@ sealed interface VoiceLockUiState {
     data class VerificationRejected(val similarity: Float?) : VoiceLockUiState {
         override val message = similarity?.let { "Voice similarity was ${(it * 100).toInt()}%, below the required level. Please try again." }
             ?: "We could not confirm your identity. Please try again."
+    }
+    data class IdentificationAccepted(val displayName: String, val similarity: Float) : VoiceLockUiState {
+        override val message = "$displayName is the closest enrolled speaker. Voice similarity: ${(similarity * 100).toInt()}%."
+    }
+    data class UnknownSpeaker(val bestSimilarity: Float?) : VoiceLockUiState {
+        override val message = bestSimilarity?.let {
+            "No enrolled speaker reached the required level. Best voice similarity: ${(it * 100).toInt()}%."
+        } ?: "No enrolled speaker could be identified."
     }
     data class Error(val detail: String) : VoiceLockUiState {
         override val message = detail
