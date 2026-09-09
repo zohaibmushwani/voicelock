@@ -23,5 +23,4 @@ object ModelAssetInstaller {
     }
 
     fun embeddingModel(context: Context): File = install(context, "voxceleb_ECAPA512_LM.onnx")
-    fun vadModel(context: Context): File = install(context, "silero_vad_v6.2.1.onnx")
 }

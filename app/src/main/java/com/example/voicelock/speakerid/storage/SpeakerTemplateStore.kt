@@ -6,6 +6,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.voicelock.speakerid.auth.VoiceTemplateStore
 import java.nio.ByteBuffer
+import androidx.core.content.edit
 
 /**
  * Securely stores speaker embeddings (templates) using Android Keystore and EncryptedSharedPreferences.
@@ -26,6 +27,10 @@ class SpeakerTemplateStore(context: Context) : VoiceTemplateStore {
     )
 
     override suspend fun read(): FloatArray? {
+        if (sharedPrefs.getInt(KEY_TEMPLATE_VERSION, 0) != CURRENT_TEMPLATE_VERSION) {
+            sharedPrefs.edit { remove(KEY_TEMPLATE).remove(KEY_TEMPLATE_VERSION) }
+            return null
+        }
         val base64String = sharedPrefs.getString(KEY_TEMPLATE, null) ?: return null
         return try {
             val bytes = Base64.decode(base64String, Base64.DEFAULT)
@@ -40,11 +45,14 @@ class SpeakerTemplateStore(context: Context) : VoiceTemplateStore {
         val buffer = ByteBuffer.allocate(template.size * 4)
         template.forEach { buffer.putFloat(it) }
         val base64String = Base64.encodeToString(buffer.array(), Base64.DEFAULT)
-        sharedPrefs.edit().putString(KEY_TEMPLATE, base64String).apply()
+        sharedPrefs.edit()
+            .putString(KEY_TEMPLATE, base64String)
+            .putInt(KEY_TEMPLATE_VERSION, CURRENT_TEMPLATE_VERSION)
+            .apply()
     }
 
     override suspend fun clear() {
-        sharedPrefs.edit().remove(KEY_TEMPLATE).apply()
+        sharedPrefs.edit().remove(KEY_TEMPLATE).remove(KEY_TEMPLATE_VERSION).apply()
     }
 
     /**
@@ -74,5 +82,7 @@ class SpeakerTemplateStore(context: Context) : VoiceTemplateStore {
 
     companion object {
         private const val KEY_TEMPLATE = "default_speaker_template"
+        private const val KEY_TEMPLATE_VERSION = "default_speaker_template_version"
+        private const val CURRENT_TEMPLATE_VERSION = 2
     }
 }

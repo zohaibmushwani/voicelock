@@ -14,7 +14,6 @@ DESTINATION = ROOT / "app" / "src" / "main" / "assets" / "models"
 MODELS = (
     ("Wespeaker/wespeaker-ecapa-tdnn512-LM", "a2f3dcb1c8702caccc7a55ceb57f5e8d1842112b", "voxceleb_ECAPA512_LM.onnx", "voxceleb_ECAPA512_LM.onnx", "d71b85d9b48058ef68004f04f1b78acebefb9dfcf542e19b976a12a5ad1f10b0"),
     ("Wespeaker/wespeaker-ecapa-tdnn512-LM", "a2f3dcb1c8702caccc7a55ceb57f5e8d1842112b", "config.yaml", "ecapa_config.yaml", ""),
-    ("bitsydarel/silero-vad-onnx", "main", "silero_vad_v6.2.1.onnx", "silero_vad_v6.2.1.onnx", "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"),
 )
 
 

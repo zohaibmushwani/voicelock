@@ -1,8 +1,4 @@
-"""Create and validate an INT8-weight mobile copy of the ECAPA ONNX model.
-
-Silero VAD is deliberately not quantized here: its recurrent state makes output-regression
-validation especially important, while its FP32 model is only about 2.3 MB.
-"""
+"""Create and validate an INT8-weight mobile copy of the ECAPA ONNX model."""
 
 from __future__ import annotations
 

@@ -4,7 +4,7 @@ Building the backend audio pipeline for an Android voice-unlock app using speake
 
 Key Components:
 1. AUDIO CAPTURE: 16kHz mono PCM wrapper around AudioRecord.
-2. VOICE ACTIVITY DETECTION: Silero VAD (ONNX) to trim silence and reject short utterances.
+2. VOICE ACTIVITY DETECTION: The maintained `gkonovalov/android-vad` WebRTC module trims silence and rejects short utterances without a separate VAD model.
 3. FEATURE EXTRACTION (NDK): kaldi-native-fbank (JNI/CMake) for 80-bin FBank, 25ms window, 10ms hop, 16kHz. Apply CMN.
 4. EMBEDDING INFERENCE: voxceleb_ECAPA512_LM.onnx (ECAPA-TDNN) via ONNX Runtime Mobile. NNAPI delegate. L2-normalized output.
 5. ENROLLMENT & VERIFICATION LOGIC: Cosine similarity comparison. Android Keystore-backed encryption for local storage. 
@@ -30,7 +30,8 @@ Building a secure, speaker-verification-based voice-unlock application for Andro
 *   **Jetpack Compose**: Modern declarative UI framework for a responsive interface.
 *   **Jetpack Navigation 3**: State-driven navigation architecture for seamless flow between enrollment and verification states.
 *   **Compose Material Adaptive**: Implementation of adaptive layouts ensuring a consistent experience across different device form factors.
-*   **ONNX Runtime Mobile**: Efficient execution of the ECAPA-TDNN embedding model and Silero VAD on-device (supporting NNAPI acceleration).
+*   **ONNX Runtime Mobile**: Efficient execution of the ECAPA-TDNN embedding model on-device (supporting NNAPI acceleration).
+*   **Android WebRTC VAD**: Lightweight, model-free speech detection through the maintained `gkonovalov/android-vad` library.
 *   **kaldi-native-fbank (JNI/NDK)**: High-performance C++ backend for FBank feature extraction.
 *   **Kotlin Coroutines**: Asynchronous management of the audio capture and inference pipeline.
 
@@ -56,12 +57,12 @@ Navigation 3 uses serializable sealed `AppDestination` keys: `Permission → Hom
   - CMN logic matches the expected normalization from config.yaml
 - **Duration:** 31m 31s
 
-### Task_2_AudioVADPreProcessing: Implement Audio Capture wrapper for 16kHz mono PCM and integrate Silero VAD via ONNX Runtime to trim silence and reject short utterances (< 0.75s).
+### Task_2_AudioVADPreProcessing: Implement Audio Capture for 16kHz mono PCM and integrate the Android WebRTC VAD library to trim silence and reject short utterances (< 0.75s).
 - **Status:** COMPLETED
 - **Updates:** Implemented Audio Capture and VAD.
 - **Acceptance Criteria:**
   - Audio capture provides clean PCM stream/buffers
-  - Silero VAD correctly identifies and trims speech segments
+  - WebRTC VAD correctly identifies and trims speech segments without a separate model asset
   - Short utterances are rejected with specific error codes
 
 ### Task_3_EmbeddingSecureStorage: Load ECAPA-TDNN model via ONNX Runtime Mobile with NNAPI. Implement L2-normalized embedding inference. Set up Android Keystore-backed encryption for local storage of speaker templates.
@@ -94,4 +95,3 @@ Navigation 3 uses serializable sealed `AppDestination` keys: `Permission → Hom
   - All core VoiceAuthEngine functions work as expected
   - Critic agent approves implementation quality
 - **Duration:** 4m 8s
-

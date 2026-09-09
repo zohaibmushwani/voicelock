@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.voicelock.speakerid.FBankExtractor
 import com.example.voicelock.speakerid.VoiceLockLog
 import com.example.voicelock.speakerid.audio.AudioCapture
-import com.example.voicelock.speakerid.audio.OnnxSileroVad
+import com.example.voicelock.speakerid.audio.WebRtcVoiceActivityDetector
 import com.example.voicelock.speakerid.auth.DefaultVoiceAuthEngine
 import com.example.voicelock.speakerid.auth.EnrollmentResult
 import com.example.voicelock.speakerid.auth.VerificationResult
@@ -28,7 +28,7 @@ class VoiceLockViewModel(application: Application) : AndroidViewModel(applicatio
     private val storeDelegate = lazy { SpeakerTemplateStore(application) }
     private val store by storeDelegate
     private val engineDelegate = lazy {
-        val vad = OnnxSileroVad(ModelAssetInstaller.vadModel(application))
+        val vad = WebRtcVoiceActivityDetector()
         val encoder = SpeakerEncoder(ModelAssetInstaller.embeddingModel(application))
         DefaultVoiceAuthEngine(AndroidVoiceEmbeddingProvider(vad, FBankExtractor(), encoder), store)
     }

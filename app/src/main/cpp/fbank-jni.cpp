@@ -17,21 +17,29 @@ Java_com_example_voicelock_speakerid_FBankExtractor_computeFBank(
     }
 
     jfloat *pcm_ptr = env->GetFloatArrayElements(pcm_audio, nullptr);
+    // AudioRecord provides normalized PCM floats, while the WeSpeaker ONNX reference frontend
+    // scales decoded audio to signed 16-bit amplitude before Kaldi FBank extraction.
+    std::vector<float> scaled_pcm(len);
+    for (jsize i = 0; i < len; ++i) {
+        scaled_pcm[i] = pcm_ptr[i] * 32768.0f;
+    }
+    env->ReleaseFloatArrayElements(pcm_audio, pcm_ptr, JNI_ABORT);
 
     // Configuration: 16kHz sample rate, 25ms window, 10ms hop, 80-bin FBank
-    // Parameters verified against ecapa_config.yaml
+    // Match WeSpeaker's infer_onnx.py frontend exactly.
     knf::FbankOptions opts;
     opts.frame_opts.samp_freq = 16000.0f;
     opts.frame_opts.frame_length_ms = 25.0f;
     opts.frame_opts.frame_shift_ms = 10.0f;
-    opts.frame_opts.dither = 1.0f; // As per ecapa_config.yaml
+    opts.frame_opts.dither = 0.0f;
+    opts.frame_opts.window_type = "hamming";
     opts.mel_opts.num_bins = 80;
+    opts.use_energy = false;
+    opts.energy_floor = 0.0f;
 
     knf::OnlineFbank fbank(opts);
-    fbank.AcceptWaveform(16000.0f, pcm_ptr, len);
+    fbank.AcceptWaveform(16000.0f, scaled_pcm.data(), len);
     fbank.InputFinished();
-
-    env->ReleaseFloatArrayElements(pcm_audio, pcm_ptr, JNI_ABORT);
 
     int32_t num_frames = fbank.NumFramesReady();
     int32_t dim = opts.mel_opts.num_bins;

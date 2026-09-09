@@ -1,14 +1,14 @@
 # VoiceLock
 
-VoiceLock is an experimental, fully on-device speaker-verification app for Android. It records guided enrollment samples, removes silence with Silero VAD, creates a speaker embedding with ECAPA-TDNN, and reports the cosine-similarity confidence for a later verification attempt.
+VoiceLock is an experimental, fully on-device speaker-verification app for Android. It records guided enrollment samples, removes silence with WebRTC VAD, creates a speaker embedding with ECAPA-TDNN, and reports the cosine-similarity confidence for a later verification attempt.
 
 The app uses Jetpack Compose and Navigation 3 with serializable sealed destinations. Enrollment, verification, permissions, retry paths, confidence results, and a compact in-app status log are represented directly in the UI so the flow remains understandable without Android Studio logcat.
 
 ## Voice pipeline
 
 1. Capture mono 16 kHz PCM audio.
-2. Detect and trim speech with Silero VAD; reject missing or very short speech.
-3. Compute 80-bin filter-bank features through the native C++/JNI extractor.
+2. Detect and trim speech with the `gkonovalov/android-vad` WebRTC library; reject missing or very short speech.
+3. Compute WeSpeaker-compatible 80-bin filter-bank features through the native C++/JNI extractor (16-bit amplitude scale, Hamming window, no inference dither, and per-utterance CMN).
 4. Produce a normalized 192-dimensional ECAPA-TDNN speaker embedding with ONNX Runtime.
 5. Average validated enrollment embeddings and encrypt the template at rest.
 6. Compare a verification embedding with the template using cosine similarity.
@@ -52,11 +52,11 @@ python tools/model_prep/inspect_onnx.py
 python tools/model_prep/optimize_mobile.py
 ```
 
-`download_models.py` validates known SHA-256 hashes. If Hugging Face requires authentication, provide `HF_TOKEN` only as a process environment variable; never add it to this repository. The optimizer produces `voxceleb_ECAPA512_LM.int8.onnx` and validates its output against the FP32 model. Silero VAD remains FP32 because it is small and stateful. All generated files under `app/src/main/assets/models/` are ignored by Git.
+`download_models.py` validates the known SHA-256 hash. If Hugging Face requires authentication, provide `HF_TOKEN` only as a process environment variable; never add it to this repository. The optimizer produces `voxceleb_ECAPA512_LM.int8.onnx` and validates its output against the FP32 model. VAD uses the model-free WebRTC module from `gkonovalov/android-vad`; no VAD weight download is required. All generated files under `app/src/main/assets/models/` are ignored by Git.
 
 ## Model attribution
 
 - `voxceleb_ECAPA512_LM.onnx` and its derived INT8 copy come from [Wespeaker/wespeaker-ecapa-tdnn512-LM](https://huggingface.co/Wespeaker/wespeaker-ecapa-tdnn512-LM), revision `a2f3dcb1c8702caccc7a55ceb57f5e8d1842112b`, licensed CC BY 4.0.
-- `silero_vad_v6.2.1.onnx` comes from [bitsydarel/silero-vad-onnx](https://huggingface.co/bitsydarel/silero-vad-onnx), based on Silero VAD and licensed MIT.
+- Voice activity detection uses the MIT-licensed [gkonovalov/android-vad](https://github.com/gkonovalov/android-vad) WebRTC module, version `2.0.10`.
 
 Review the upstream model cards and licenses before redistribution or production use.

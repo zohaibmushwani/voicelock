@@ -44,6 +44,7 @@ datastorePreferences = "1.1.7"
 material = "1.4.+"
 onnxRuntime = "1.22.0"
 securityCrypto = "1.1.0"
+androidVad = "2.0.10"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -96,6 +97,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 onnxruntime-android = { group = "com.microsoft.onnxruntime", name = "onnxruntime-android", version.ref = "onnxRuntime" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+android-vad-webrtc = { group = "com.github.gkonovalov.android-vad", name = "webrtc", version.ref = "androidVad" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
