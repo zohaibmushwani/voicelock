@@ -30,7 +30,7 @@ fun VoiceLockNavHost(
     } }
     LaunchedEffect(hasMicrophonePermission) {
         if (hasMicrophonePermission && backStack.lastOrNull() == AppDestination.Permission) {
-            backStack.removeLast()
+            backStack.removeTop()
             backStack.add(AppDestination.Home)
         }
     }
@@ -38,15 +38,15 @@ fun VoiceLockNavHost(
         viewModel.events.collect { event ->
             when (event) {
                 is VoiceFlowEvent.EnrollmentProgress -> {
-                    if (backStack.lastOrNull() is AppDestination.Enroll) backStack.removeLast()
+                    if (backStack.lastOrNull() is AppDestination.Enroll) backStack.removeTop()
                     backStack.add(AppDestination.Enroll(event.completed))
                 }
                 VoiceFlowEvent.EnrollmentComplete -> {
-                    if (backStack.lastOrNull() is AppDestination.Enroll) backStack.removeLast()
+                    if (backStack.lastOrNull() is AppDestination.Enroll) backStack.removeTop()
                     backStack.add(AppDestination.Result(ResultType.ENROLLMENT))
                 }
                 is VoiceFlowEvent.Verification -> {
-                    if (backStack.lastOrNull() == AppDestination.Verify) backStack.removeLast()
+                    if (backStack.lastOrNull() == AppDestination.Verify) backStack.removeTop()
                     backStack.add(AppDestination.Result(ResultType.VERIFICATION, event.accepted, event.percent))
                 }
                 is VoiceFlowEvent.Failed -> Unit
@@ -56,7 +56,7 @@ fun VoiceLockNavHost(
     NavDisplay(
         backStack = backStack,
         modifier = modifier,
-        onBack = { if (!ui.busy && backStack.size > 1) backStack.removeLastOrNull() },
+        onBack = { if (!ui.busy && backStack.size > 1) backStack.removeTop() },
         entryProvider = entryProvider {
             entry<AppDestination.Permission> {
                 VoiceLockScreen(VoiceLockUiState.PermissionRequired, onEnroll = requestMicrophonePermission, onVerify = requestMicrophonePermission, statusLines = ui.logs)
@@ -102,6 +102,15 @@ fun VoiceLockNavHost(
             }
         },
     )
+}
+
+/**
+ * Navigation 3's [NavBackStack] is list-like, but its newer `removeLast` member is not
+ * present in every compatible runtime artifact. Use the stable MutableList operation so
+ * an app built against a newer compiler cannot fail on an older Navigation 3 runtime.
+ */
+private fun <T> MutableList<T>.removeTop() {
+    removeAt(lastIndex)
 }
 
 private val ENROLLMENT_SENTENCES = listOf(
